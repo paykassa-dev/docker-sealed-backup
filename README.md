@@ -9,12 +9,13 @@ tar → zstd (compression) → age (encryption) → Irys → Arweave
 Packaged as a self-contained Docker image — no local tooling required.
 
 ```bash
-# latest
 docker pull ghcr.io/paykassa-dev/docker-sealed-backup:latest
-
-# pinned to a specific commit (recommended for production)
-docker pull ghcr.io/paykassa-dev/docker-sealed-backup:b053098d26dc2474d5cf54bcbc629dc7b3fe4faa
 ```
+
+> **RPC endpoints:** the image ships working public defaults per token
+> (Polygon → `polygon.drpc.org`, Ethereum → `eth.drpc.org`, BNB → `bsc.drpc.org`),
+> because the Irys SDK's own default (`polygon-rpc.com`) is frequently rate-limited and
+> makes funding hang. For heavy use, pass your own dedicated endpoint via `IRYS_RPC`.
 
 ## Quick start
 
@@ -34,22 +35,27 @@ docker run --rm \
 # 3. Check upload cost
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
-  -e IRYS_TOKEN="matic" \
+  -v "$(pwd)/keys":/keys:ro \
   ghcr.io/paykassa-dev/docker-sealed-backup price
 
 # 4. Fund your Irys balance (0.5 MATIC = 500000000000000000 atomic units)
-docker run --rm -it \
+docker run --rm \
   -v "$(pwd)/keys":/keys:ro \
   -e AMOUNT="500000000000000000" \
   ghcr.io/paykassa-dev/docker-sealed-backup fund
 
-# 5. Upload to Arweave
+# 5. Check funded balance
+docker run --rm \
+  -v "$(pwd)/keys":/keys:ro \
+  ghcr.io/paykassa-dev/docker-sealed-backup balance
+
+# 6. Upload to Arweave
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
   -v "$(pwd)/keys":/keys:ro \
   ghcr.io/paykassa-dev/docker-sealed-backup upload
 
-# 6. Decrypt (any time, from anyone with the private key)
+# 7. Decrypt (any time, from anyone with the private key)
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
   -v "$(pwd)/restored":/output \
@@ -66,6 +72,7 @@ docker run --rm \
 | `decrypt` | Decrypt and decompress to `DECRYPT_DIR`                         |
 | `price`   | Show Irys upload cost for `TARGET_FILE` (must be `.age`)        |
 | `fund`    | Fund the Irys node balance                                      |
+| `balance` | Show current funded Irys node balance                          |
 | `upload`  | Upload `TARGET_FILE` to Arweave via Irys (must be `.age`)       |
 | `help`    | Print usage (default)                                           |
 
@@ -86,12 +93,16 @@ docker run --rm \
 
 ### Irys / Arweave
 
+Uses the [`@irys/upload`](https://www.npmjs.com/package/@irys/upload) SDK (non-interactive).
+
 | Variable       | Default              | Description                                      |
 |----------------|----------------------|--------------------------------------------------|
 | `IRYS_NODE`    | `mainnet`            | Irys network (`mainnet` or `devnet`)             |
-| `IRYS_TOKEN`   | `matic`              | Payment token                                    |
-| `EVM_KEY_FILE` | `/keys/evm_pk.txt`   | Path to EVM private key file (hex, no `0x`)      |
+| `IRYS_TOKEN`   | `matic`              | Payment token (`matic`, `ethereum`, `bnb`, …)    |
+| `IRYS_RPC`     | per-token default    | Custom RPC URL (defaults: drpc.org per token — see note above) |
+| `EVM_KEY_FILE` | `/keys/evm_pk.txt`   | EVM private key file, hex (needed for fund/price/balance/upload) |
 | `AMOUNT`       | —                    | Atomic units to fund (**required for `fund`**)   |
+| `ADDRESS`      | own wallet           | Address to query for `balance` (optional)        |
 
 ## Upload safety guard
 
@@ -128,8 +139,9 @@ The file is then permanently available on Arweave at that URL.
 | `keygen`  | `/keys`                            | `rw`                       |
 | `encrypt` | `/data`, `/output`                 | `/data` is `ro`            |
 | `decrypt` | `/input`, `/output`, `/keys`       | `/input`, `/keys` are `ro` |
-| `price`   | `/input`                           | `ro`                       |
+| `price`   | `/input`, `/keys`                  | both `ro`                  |
 | `fund`    | `/keys`                            | `ro`                       |
+| `balance` | `/keys`                            | `ro`                       |
 | `upload`  | `/input`, `/keys`                  | both `ro`                  |
 
 ## Compression levels
@@ -143,11 +155,12 @@ The file is then permanently available on Arweave at that URL.
 ## Using the Makefile
 
 ```bash
-# native (requires age + zstd + irys installed locally)
+# native (requires age + zstd locally, and: cd irys && npm install)
 make age-keygen
 make compress-crypt   SRC_DIR=./photos PUB_KEY=age1... ZSTD_LEVEL=9
 make irys-price
 make irys-fund        AMOUNT=500000000000000000
+make irys-balance
 make irys-upload
 
 # docker
@@ -156,6 +169,7 @@ make docker-keygen
 make docker-encrypt   SRC_DIR=./photos PUB_KEY=age1... ZSTD_LEVEL=9
 make docker-price
 make docker-fund      AMOUNT=500000000000000000
+make docker-balance
 make docker-upload
 make docker-decrypt   DECRYPT_DIR=./restored
 ```

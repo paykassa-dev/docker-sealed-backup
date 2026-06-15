@@ -5,6 +5,9 @@ decrypt/
 test_data/
 .claude/
 
+# node
+node_modules/
+
 # encrypted archives
 *.age
 *.zst

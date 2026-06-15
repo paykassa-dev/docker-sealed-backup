@@ -15,19 +15,23 @@ PUB_KEY      := age1pe9pcx2gw6x48tk3gc38u2usd9fm2ytzsv5r2rcdxdqgs7378qdqrstdul
 ZSTD_LEVEL   := 3
 THREADS      := 0
 
-# ── irys / arweave ─────────────────────────────────────────────────────────────
+# ── irys / arweave (via @irys/upload SDK) ────────────────────────────────────────
 IRYS_NODE    := mainnet
 IRYS_TOKEN   := matic
+IRYS_RPC     :=
 EVM_KEY_FILE := $(KEYS_DIR)/evm_pk.txt
 # AMOUNT is in atomic units: 1 MATIC = 1000000000000000000
 AMOUNT       := 500000000000000000
+# native runner (requires: cd irys && npm install)
+RUNNER       := node irys/irys.mjs
+IRYS_ENV     := IRYS_NODE="$(IRYS_NODE)" IRYS_TOKEN="$(IRYS_TOKEN)" IRYS_RPC="$(IRYS_RPC)" EVM_KEY_FILE="$(EVM_KEY_FILE)"
 
 # ── docker ─────────────────────────────────────────────────────────────────────
 IMAGE        := ghcr.io/paykassa-dev/docker-sealed-backup:latest
 
 .PHONY: age-keygen compress-crypt decompress-decrypt \
         test_compress_crypt test_decompress_decrypt \
-        irys-price irys-fund irys-upload \
+        irys-price irys-fund irys-balance irys-upload \
         docker-build docker-keygen docker-encrypt docker-decrypt \
         docker-price docker-fund docker-upload docker-balance
 
@@ -56,19 +60,20 @@ irys-price:
 	  echo "ERROR: TARGET_FILE='$(TARGET_FILE)' must end in .age" >&2; exit 1;; esac
 	@head -c 23 "$(TARGET_FILE)" | grep -qF "age-encryption.org" || \
 	  { echo "ERROR: $(TARGET_FILE) is missing the age header — upload aborted." >&2; exit 1; }
-	@SIZE=$$(wc -c < "$(TARGET_FILE)" | awk '{print $$1}') && \
-	  echo "File: $(TARGET_FILE) ($$SIZE bytes)" && \
-	  irys price $$SIZE -n $(IRYS_NODE) -t $(IRYS_TOKEN)
+	$(IRYS_ENV) TARGET_FILE="$(TARGET_FILE)" $(RUNNER) price
 
 irys-fund:
-	irys fund $(AMOUNT) -n $(IRYS_NODE) -t $(IRYS_TOKEN) -w "$$(cat $(EVM_KEY_FILE))"
+	$(IRYS_ENV) AMOUNT="$(AMOUNT)" $(RUNNER) fund
+
+irys-balance:
+	$(IRYS_ENV) ADDRESS="$(ADDRESS)" $(RUNNER) balance
 
 irys-upload:
 	@case "$(TARGET_FILE)" in *.age) ;; *) \
 	  echo "ERROR: TARGET_FILE='$(TARGET_FILE)' must end in .age — only encrypted archives may be uploaded." >&2; exit 1;; esac
 	@head -c 23 "$(TARGET_FILE)" | grep -qF "age-encryption.org" || \
 	  { echo "ERROR: $(TARGET_FILE) is missing the age header — upload aborted." >&2; exit 1; }
-	irys upload $(TARGET_FILE) -n $(IRYS_NODE) -t $(IRYS_TOKEN) -w "$$(cat $(EVM_KEY_FILE))"
+	$(IRYS_ENV) TARGET_FILE="$(TARGET_FILE)" $(RUNNER) upload
 
 # ── docker targets ─────────────────────────────────────────────────────────────
 
@@ -101,24 +106,29 @@ docker-decrypt:
 docker-price:
 	docker run --rm \
 	  -v "$(abspath $(CRYPTED_DIR))":/input:ro \
+	  -v "$(abspath $(KEYS_DIR))":/keys:ro \
 	  -e TARGET_FILE="/input/$(notdir $(TARGET_FILE))" \
 	  -e IRYS_NODE="$(IRYS_NODE)" \
 	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
+	  -e IRYS_RPC="$(IRYS_RPC)" \
 	  $(IMAGE) price
 
 docker-fund:
-	docker run --rm -it \
+	docker run --rm \
 	  -v "$(abspath $(KEYS_DIR))":/keys:ro \
 	  -e AMOUNT="$(AMOUNT)" \
 	  -e IRYS_NODE="$(IRYS_NODE)" \
 	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
+	  -e IRYS_RPC="$(IRYS_RPC)" \
 	  $(IMAGE) fund
 
 docker-balance:
 	docker run --rm \
+	  -v "$(abspath $(KEYS_DIR))":/keys:ro \
 	  -e ADDRESS="$(ADDRESS)" \
 	  -e IRYS_NODE="$(IRYS_NODE)" \
 	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
+	  -e IRYS_RPC="$(IRYS_RPC)" \
 	  $(IMAGE) balance
 
 docker-upload:
@@ -128,4 +138,5 @@ docker-upload:
 	  -e TARGET_FILE="/input/$(notdir $(TARGET_FILE))" \
 	  -e IRYS_NODE="$(IRYS_NODE)" \
 	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
+	  -e IRYS_RPC="$(IRYS_RPC)" \
 	  $(IMAGE) upload

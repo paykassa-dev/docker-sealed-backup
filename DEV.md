@@ -7,16 +7,20 @@
 | Docker   | https://docs.docker.com/get-docker/          |
 | age      | `brew install age` / `apk add age`           |
 | zstd     | `brew install zstd` / `apk add zstd`         |
-| Node.js  | `brew install node` / `apk add nodejs npm`   |
-| irys CLI | `npm install -g @irys/cli@0.0.19`            |
+| Node.js  | `brew install node` (≥ 18)                   |
+| Irys SDK | `cd irys && npm install` (for native targets)|
 | GNU make | bundled on Linux, `brew install make` on mac |
 
 ## Project structure
 
 ```
 .
-├── Dockerfile        # Alpine image: age + zstd + nodejs + @irys/cli
-├── entrypoint.sh     # Command dispatcher (keygen/encrypt/decrypt/price/fund/upload)
+├── Dockerfile        # Multi-stage Alpine: age + zstd + nodejs + Irys SDK
+├── entrypoint.sh     # Command dispatcher (keygen/encrypt/decrypt/price/fund/balance/upload)
+├── irys/             # Irys SDK runner (replaces the legacy @irys/cli)
+│   ├── irys.mjs      #   programmatic fund/price/balance/upload
+│   ├── package.json  #   pinned @irys/upload + @irys/upload-ethereum
+│   └── package-lock.json
 ├── Makefile          # Native and docker targets
 ├── README.md         # End-user image documentation
 ├── DEV.md            # This file
@@ -26,14 +30,29 @@
 └── decrypt/          # Decrypted output — gitignored
 ```
 
+## Irys: SDK, not CLI
+
+This project uses the modular **`@irys/upload` + `@irys/upload-ethereum`** SDK via a small
+Node runner (`irys/irys.mjs`), **not** the legacy `@irys/cli`. The CLI is interactive
+(prompts `Y/N` and crashes on closed stdin in Docker) and bundled with stale native deps.
+The SDK path is fully non-interactive and is what the `fund`/`price`/`balance`/`upload`
+commands call.
+
+> **Why we override the default RPC.** The SDK's `Matic` token defaults to
+> `https://polygon-rpc.com`, which is frequently rate-limited/disabled (HTTP 403); the tx
+> then never broadcasts and `fund` hangs. `irys.mjs` ships a `DEFAULT_RPC` map with working
+> public endpoints per token (`polygon.drpc.org`, `eth.drpc.org`, `bsc.drpc.org`), overridable
+> via `IRYS_RPC`. Verified: `fund 0.005 MATIC` completes in ~35 s using the baked-in default.
+
 ## Build the image
 
 ```bash
 make docker-build IMAGE=ghcr.io/paykassa-dev/docker-sealed-backup:latest
 ```
 
-The image includes `age`, `zstd`, `nodejs`, and `@irys/cli@0.0.19`.  
-It is larger than the previous crypto-only image (~300 MB vs ~10 MB) due to Node.js.
+Multi-stage build: the `deps` stage compiles the Irys SDK's native modules (needs
+`python3 make g++`), then only `node_modules` is copied into the runtime stage (which
+carries just `age`, `zstd`, `tar`, `bash`, `nodejs`).
 
 ## Wallet setup (EVM / Polygon)
 
@@ -47,20 +66,23 @@ It is larger than the previous crypto-only image (~300 MB vs ~10 MB) due to Node
 
 To use devnet for testing (free test tokens):
 ```bash
-make docker-fund IRYS_NODE=devnet AMOUNT=1000000000000000000
+make docker-fund IRYS_NODE=devnet AMOUNT=1000000000000000000 IRYS_RPC=https://your-rpc
 ```
 
 ## Run the full pipeline locally (native, no Docker)
 
 ```bash
+cd irys && npm install && cd ..   # one-time: install the Irys SDK
+
 make age-keygen
 make compress-crypt     SRC_DIR=./test_data ZSTD_LEVEL=3
 make decompress-decrypt
 diff -r test_data decrypt/   # should be empty
 
-# Arweave upload (requires irys CLI and funded wallet)
+# Arweave upload (requires a funded wallet; RPC defaults are built in)
 make irys-price
-make irys-fund  AMOUNT=500000000000000000
+make irys-fund     AMOUNT=500000000000000000
+make irys-balance
 make irys-upload
 ```
 
@@ -74,6 +96,7 @@ make docker-keygen
 make docker-encrypt SRC_DIR=./test_data PUB_KEY=age1...
 make docker-price
 make docker-fund    AMOUNT=500000000000000000
+make docker-balance
 make docker-upload
 make docker-decrypt
 diff -r test_data decrypt/   # should be empty
@@ -138,12 +161,22 @@ make docker-upload \
 
 - All paths come from env vars with sane defaults.
 - Strict mode: `set -euo pipefail` — any failure exits non-zero.
-- `_assert_encrypted` guards `price`, `fund`, and `upload` — checks both `.age` extension and the `age-encryption.org` binary header. Call it at the top of any new command that touches external networks.
+- `_assert_encrypted` guards `price` and `upload` — checks both `.age` extension and the `age-encryption.org` binary header. Call it at the top of any new command that touches external networks.
 - `_require_evm_key` validates the EVM key file exists before use.
+- Irys commands delegate to `node /opt/irys/irys.mjs <cmd>`; config is passed through exported env vars (`IRYS_NODE`, `IRYS_TOKEN`, `IRYS_RPC`, `EVM_KEY_FILE`, `TARGET_FILE`, `AMOUNT`, `ADDRESS`).
 - Adding a new command: add a `case` branch, call the appropriate guards, document env vars used.
+
+## irys/irys.mjs notes
+
+- Token map: `matic`→`Matic`, `ethereum`→`Ethereum`, `bnb`→`BNB`, etc. (from `@irys/upload-ethereum`).
+- `DEFAULT_RPC` map provides a working public RPC per token; `IRYS_RPC` overrides it.
+- Builder chain: `Uploader(Token).withWallet(pk)[.withRpc(rpc)][.devnet()]`.
+- All amounts are atomic units; `utils.fromAtomic()` is used only for display.
+- `balance` uses the wallet address derived from the key, unless `ADDRESS` overrides it.
 
 ## Dockerfile notes
 
 - Base image pinned by digest (`alpine:3.24.0@sha256:...`) for reproducibility.
-- `@irys/cli` pinned to `0.0.19`. To upgrade: update both the Dockerfile and this file.
+- SDK versions pinned in `irys/package.json` + `irys/package-lock.json`; `npm ci` enforces the lock.
+- To upgrade the SDK: bump `irys/package.json`, run `npm install --package-lock-only` in `irys/`, rebuild.
 - No secrets, keys, or data are baked into the image.

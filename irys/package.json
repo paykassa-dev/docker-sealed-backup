@@ -1,0 +1,11 @@
+{
+  "name": "sealed-backup-irys",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Irys SDK runner for fund/price/balance/upload (Polygon MATIC)",
+  "dependencies": {
+    "@irys/upload": "0.0.15",
+    "@irys/upload-ethereum": "0.0.16"
+  }
+}
