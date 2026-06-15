@@ -23,7 +23,7 @@ EVM_KEY_FILE := $(KEYS_DIR)/evm_pk.txt
 AMOUNT       := 500000000000000000
 
 # ── docker ─────────────────────────────────────────────────────────────────────
-IMAGE        := crypto-compress:latest
+IMAGE        := ghcr.io/paykassa-dev/docker-sealed-backup:latest
 
 .PHONY: age-keygen compress-crypt decompress-decrypt \
         test_compress_crypt test_decompress_decrypt \

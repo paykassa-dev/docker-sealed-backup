@@ -3,6 +3,7 @@ keys/
 crypted/
 decrypt/
 test_data/
+.claude/
 
 # encrypted archives
 *.age

@@ -1,4 +1,4 @@
-# crypto-compress
+# docker-sealed-backup
 
 Compress, encrypt, and permanently archive directories to Arweave via a single pipeline.
 
@@ -8,43 +8,49 @@ tar → zstd (compression) → age (encryption) → Irys → Arweave
 
 Packaged as a self-contained Docker image — no local tooling required.
 
+```
+ghcr.io/paykassa-dev/docker-sealed-backup:latest
+```
+
 ## Quick start
 
 ```bash
 # 1. Generate age key pair (prints public key)
-docker run --rm -v "$(pwd)/keys":/keys crypto-compress keygen
+docker run --rm \
+  -v "$(pwd)/keys":/keys \
+  ghcr.io/paykassa-dev/docker-sealed-backup keygen
 
 # 2. Encrypt a directory
 docker run --rm \
   -v "$(pwd)/photos":/data:ro \
   -v "$(pwd)/encrypted":/output \
   -e PUB_KEY="age1..." \
-  crypto-compress encrypt
+  ghcr.io/paykassa-dev/docker-sealed-backup encrypt
 
 # 3. Check upload cost
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
   -e IRYS_TOKEN="matic" \
-  crypto-compress price
+  ghcr.io/paykassa-dev/docker-sealed-backup price
 
 # 4. Fund your Irys balance (0.5 MATIC = 500000000000000000 atomic units)
 docker run --rm \
   -v "$(pwd)/keys":/keys:ro \
   -e AMOUNT="500000000000000000" \
-  crypto-compress fund
+  ghcr.io/paykassa-dev/docker-sealed-backup fund
 
 # 5. Upload to Arweave
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
   -v "$(pwd)/keys":/keys:ro \
-  crypto-compress upload
+  ghcr.io/paykassa-dev/docker-sealed-backup upload
 
 # 6. Decrypt (any time, from anyone with the private key)
 docker run --rm \
   -v "$(pwd)/encrypted":/input:ro \
   -v "$(pwd)/restored":/output \
   -v "$(pwd)/keys":/keys:ro \
-  crypto-compress decrypt
+  ghcr.io/paykassa-dev/docker-sealed-backup decrypt
 ```
 
 ## Commands
@@ -113,14 +119,14 @@ The file is then permanently available on Arweave at that URL.
 
 ## Volume mounts
 
-| Command   | Mount                              | Mode                     |
-|-----------|------------------------------------|--------------------------|
-| `keygen`  | `/keys`                            | `rw`                     |
-| `encrypt` | `/data`, `/output`                 | `/data` is `ro`          |
+| Command   | Mount                              | Mode                       |
+|-----------|------------------------------------|----------------------------|
+| `keygen`  | `/keys`                            | `rw`                       |
+| `encrypt` | `/data`, `/output`                 | `/data` is `ro`            |
 | `decrypt` | `/input`, `/output`, `/keys`       | `/input`, `/keys` are `ro` |
-| `price`   | `/input`                           | `ro`                     |
-| `fund`    | `/keys`                            | `ro`                     |
-| `upload`  | `/input`, `/keys`                  | both `ro`                |
+| `price`   | `/input`                           | `ro`                       |
+| `fund`    | `/keys`                            | `ro`                       |
+| `upload`  | `/input`, `/keys`                  | both `ro`                  |
 
 ## Compression levels
 
@@ -155,7 +161,7 @@ make docker-decrypt   DECRYPT_DIR=./restored
 ```yaml
 services:
   encrypt:
-    image: crypto-compress:latest
+    image: ghcr.io/paykassa-dev/docker-sealed-backup:latest
     command: encrypt
     environment:
       PUB_KEY: "age1..."
@@ -165,7 +171,7 @@ services:
       - ./encrypted:/output
 
   upload:
-    image: crypto-compress:latest
+    image: ghcr.io/paykassa-dev/docker-sealed-backup:latest
     command: upload
     environment:
       IRYS_TOKEN: matic

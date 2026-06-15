@@ -29,7 +29,7 @@
 ## Build the image
 
 ```bash
-make docker-build IMAGE=myrepo/crypto-compress:latest
+make docker-build IMAGE=ghcr.io/paykassa-dev/docker-sealed-backup:latest
 ```
 
 The image includes `age`, `zstd`, `nodejs`, and `@irys/cli@0.0.19`.  
@@ -106,7 +106,7 @@ done
 ## Publish the image
 
 ```bash
-IMAGE=ghcr.io/<your-org>/crypto-compress
+IMAGE=ghcr.io/<your-org>/docker-sealed-backup
 
 docker build -t $IMAGE:latest .
 docker push $IMAGE:latest
@@ -121,7 +121,7 @@ All variables can be overridden on the command line:
 
 ```bash
 make docker-encrypt \
-  IMAGE=myrepo/crypto-compress:latest \
+  IMAGE=ghcr.io/paykassa-dev/docker-sealed-backup:latest \
   SRC_DIR=/Volumes/backup/documents \
   CRYPTED_DIR=/Volumes/nas/encrypted \
   PUB_KEY=age1... \
