@@ -38,7 +38,7 @@ docker run --rm \
   ghcr.io/paykassa-dev/docker-sealed-backup price
 
 # 4. Fund your Irys balance (0.5 MATIC = 500000000000000000 atomic units)
-docker run --rm \
+docker run --rm -it \
   -v "$(pwd)/keys":/keys:ro \
   -e AMOUNT="500000000000000000" \
   ghcr.io/paykassa-dev/docker-sealed-backup fund
