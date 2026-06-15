@@ -101,7 +101,7 @@ case "$COMMAND" in
     fi
     _require_evm_key
     echo "Funding Irys node (${IRYS_NODE}) with ${AMOUNT} atomic units of ${IRYS_TOKEN}..."
-    irys fund "$AMOUNT" -n "$IRYS_NODE" -t "$IRYS_TOKEN" -w "$(cat "$EVM_KEY_FILE")"
+    echo "y" | irys fund "$AMOUNT" -n "$IRYS_NODE" -t "$IRYS_TOKEN" -w "$(cat "$EVM_KEY_FILE")"
     ;;
 
   upload)
