@@ -107,7 +107,7 @@ docker-price:
 	  $(IMAGE) price
 
 docker-fund:
-	docker run --rm \
+	docker run --rm -it \
 	  -v "$(abspath $(KEYS_DIR))":/keys:ro \
 	  -e AMOUNT="$(AMOUNT)" \
 	  -e IRYS_NODE="$(IRYS_NODE)" \
