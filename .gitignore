@@ -1,0 +1,10 @@
+# generated output — never commit
+keys/
+crypted/
+decrypt/
+test_data/
+
+# encrypted archives
+*.age
+*.zst
+*.tar.br
