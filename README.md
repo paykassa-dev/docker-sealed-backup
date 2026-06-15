@@ -8,8 +8,12 @@ tar → zstd (compression) → age (encryption) → Irys → Arweave
 
 Packaged as a self-contained Docker image — no local tooling required.
 
-```
-ghcr.io/paykassa-dev/docker-sealed-backup:latest
+```bash
+# latest
+docker pull ghcr.io/paykassa-dev/docker-sealed-backup:latest
+
+# pinned to a specific commit (recommended for production)
+docker pull ghcr.io/paykassa-dev/docker-sealed-backup:b053098d26dc2474d5cf54bcbc629dc7b3fe4faa
 ```
 
 ## Quick start
