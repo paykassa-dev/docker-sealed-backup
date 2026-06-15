@@ -87,6 +87,15 @@ case "$COMMAND" in
     echo "Done: $DECRYPT_DIR"
     ;;
 
+  balance)
+    if [ -z "${ADDRESS:-}" ]; then
+      echo "ERROR: ADDRESS env var is required (the 0x... EVM address printed during fund/keygen)" >&2
+      exit 1
+    fi
+    echo "Irys node balance for ${ADDRESS} (${IRYS_NODE}, ${IRYS_TOKEN}):"
+    irys balance "$ADDRESS" -n "$IRYS_NODE" -t "$IRYS_TOKEN"
+    ;;
+
   price)
     _assert_encrypted "$TARGET_FILE"
     SIZE=$(wc -c < "$TARGET_FILE" | awk '{print $1}')
@@ -121,6 +130,7 @@ Commands:
   decrypt  Decrypt TARGET_FILE and extract to DECRYPT_DIR
   price    Show Irys upload cost for TARGET_FILE (must be .age)
   fund     Fund the Irys node balance (requires AMOUNT and EVM_KEY_FILE)
+  balance  Show current Irys node balance (requires ADDRESS)
   upload   Upload TARGET_FILE to Arweave via Irys (must be .age)
 
 Crypto / compression:
@@ -137,7 +147,8 @@ Irys / Arweave:
   IRYS_NODE     Irys network: mainnet or devnet  (default: mainnet)
   IRYS_TOKEN    Payment token                    (default: matic)
   EVM_KEY_FILE  Path to EVM private key file     (default: /keys/evm_pk.txt)
-  AMOUNT        Atomic units to fund (upload only, e.g. 500000000000000000 = 0.5 MATIC)
+  AMOUNT        Atomic units to fund (e.g. 500000000000000000 = 0.5 MATIC)
+  ADDRESS       EVM wallet address for balance check (0x...)
 
 Volumes to mount:
   keygen:  /keys                      (rw)

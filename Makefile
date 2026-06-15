@@ -29,7 +29,7 @@ IMAGE        := ghcr.io/paykassa-dev/docker-sealed-backup:latest
         test_compress_crypt test_decompress_decrypt \
         irys-price irys-fund irys-upload \
         docker-build docker-keygen docker-encrypt docker-decrypt \
-        docker-price docker-fund docker-upload
+        docker-price docker-fund docker-upload docker-balance
 
 # ── native targets ─────────────────────────────────────────────────────────────
 
@@ -113,6 +113,13 @@ docker-fund:
 	  -e IRYS_NODE="$(IRYS_NODE)" \
 	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
 	  $(IMAGE) fund
+
+docker-balance:
+	docker run --rm \
+	  -e ADDRESS="$(ADDRESS)" \
+	  -e IRYS_NODE="$(IRYS_NODE)" \
+	  -e IRYS_TOKEN="$(IRYS_TOKEN)" \
+	  $(IMAGE) balance
 
 docker-upload:
 	docker run --rm \
